@@ -24,5 +24,12 @@
       "src": "/(.*)",
       "dest": "frontend/$1"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/reminders/send-emails",
+      "schedule": "0 9 * * *"
+    }
   ]
 }
+

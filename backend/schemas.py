@@ -22,6 +22,7 @@ class TodoUpdate(BaseModel):
     due_date: Optional[str] = None
     reminder_time: Optional[str] = None
     completed: Optional[bool] = None
+    email_sent: Optional[bool] = None
 
 
 # ──────────────────────────────────────────────
@@ -36,6 +37,7 @@ class TodoResponse(BaseModel):
     due_date: Optional[str] = None
     reminder_time: Optional[str] = None
     completed: bool
+    email_sent: bool = False
     created_at: Optional[datetime] = None
 
     class Config:

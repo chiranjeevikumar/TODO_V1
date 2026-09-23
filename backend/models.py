@@ -24,4 +24,5 @@ class Todo(Base):
     due_date = Column(String, nullable=True)       # stored as "YYYY-MM-DD"
     reminder_time = Column(String, nullable=True)  # stored as "HH:MM"
     completed = Column(Boolean, default=False)
+    email_sent = Column(Boolean, default=False)    # True once a Gmail alert has been dispatched
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -30,6 +30,7 @@ const toast         = document.getElementById("toast");
 const statTotal     = document.getElementById("stat-total");
 const statPending   = document.getElementById("stat-pending");
 const statCompleted = document.getElementById("stat-completed");
+const emailStatus   = document.getElementById("email-status");
 
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -95,6 +96,26 @@ async function toggleComplete(id) {
 async function fetchDueReminders() {
   const res = await fetch(`${API}/reminders/due`);
   return res.json();
+}
+
+async function fetchEmailStatus() {
+  try {
+    const res = await fetch(`${API}/reminders/email-status`);
+    const data = await res.json();
+    if (emailStatus) {
+      if (data.email_configured) {
+        emailStatus.textContent = `📧 Alerts → ${data.recipient}`;
+        emailStatus.className = "email-badge configured";
+        emailStatus.title = `Gmail alerts enabled. Sending from: ${data.sender}`;
+      } else {
+        emailStatus.textContent = "📧 Email alerts off";
+        emailStatus.className = "email-badge unconfigured";
+        emailStatus.title = "Set GMAIL_USER and GMAIL_APP_PASSWORD env vars to enable email alerts.";
+      }
+    }
+  } catch (e) {
+    // Silently ignore
+  }
 }
 
 
@@ -179,6 +200,9 @@ function buildTodoCard(todo) {
   if (todo.reminder_time) {
     meta.insertAdjacentHTML("beforeend", `<span class="badge badge-time">⏰ ${todo.reminder_time}</span>`);
   }
+  if (todo.email_sent) {
+    meta.insertAdjacentHTML("beforeend", `<span class="badge badge-email">📧 Notified</span>`);
+  }
   if (todo.completed) {
     meta.insertAdjacentHTML("beforeend", `<span class="badge badge-done">✔ Done</span>`);
   }
@@ -230,6 +254,17 @@ async function checkReminders() {
     } else {
       bell.classList.add("hidden");
     }
+
+    // Trigger email alerts in background if configured
+    fetch(`${API}/reminders/send-emails`, { method: "POST" })
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.sent && data.sent.length > 0) {
+          showToast(`📧 Sent ${data.sent.length} reminder email(s)!`);
+          fetchTodos(); // Refresh to update email badges
+        }
+      })
+      .catch(() => {});
   } catch (e) {
     // Silently ignore reminder errors
   }
@@ -305,6 +340,10 @@ modal.addEventListener("click", (e) => {
 // ── Boot ──────────────────────────────────────────────────────
 
 fetchTodos();
+fetchEmailStatus();
 
 // Poll for due reminders every 60 seconds
 setInterval(checkReminders, 60_000);
+
+// Refresh email status every 5 minutes
+setInterval(fetchEmailStatus, 5 * 60_000);

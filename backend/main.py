@@ -6,12 +6,36 @@ from datetime import datetime, date
 from typing import List, Optional
 import os
 
+# Load .env file for local development (no-op if python-dotenv not installed)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from .database import engine, get_db
 from . import models
 from .schemas import TodoCreate, TodoUpdate, TodoResponse
+from .email_service import send_reminder_email, email_configured
 
 # ── Create all tables on startup ──────────────────────────────────────────────
 models.Base.metadata.create_all(bind=engine)
+
+# Auto-migrate: ensure email_sent column exists in existing tables
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        from .database import DATABASE_URL
+        if DATABASE_URL.startswith("sqlite"):
+            cols = [row[1] for row in conn.execute(text("PRAGMA table_info(todos)")).fetchall()]
+            if "email_sent" not in cols:
+                conn.execute(text("ALTER TABLE todos ADD COLUMN email_sent BOOLEAN DEFAULT 0"))
+                conn.commit()
+        else:
+            conn.execute(text("ALTER TABLE todos ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE"))
+            conn.commit()
+except Exception:
+    pass
 
 # ── App setup ─────────────────────────────────────────────────────────────────
 # root_path="/api" tells FastAPI that it is mounted under /api on Vercel,
@@ -156,3 +180,95 @@ def get_due_reminders(db: Session = Depends(get_db)):
         .all()
     )
     return due
+
+
+@app.api_route("/reminders/send-emails", methods=["GET", "POST"], tags=["Reminders"])
+def send_reminder_emails(db: Session = Depends(get_db)):
+    """
+    Scan for todos that are overdue (due_date < today) or whose reminder_time
+    has arrived today, are not yet completed, and haven't had an email sent yet.
+
+    Sends an urgent "pending task — please complete ASAP" Gmail alert for each.
+
+    Callable via:
+    - Vercel Cron Job (GET)
+    - Manual or frontend triggers (POST / GET)
+
+    Returns a summary of emails sent.
+    """
+    if not email_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD env vars."
+        )
+
+    now          = datetime.now()
+    today_str    = now.strftime("%Y-%m-%d")
+    current_hhmm = now.strftime("%H:%M")
+
+    # ── Candidate 1: fully overdue todos (due_date in the past) ──────────────
+    overdue_todos = (
+        db.query(models.Todo)
+        .filter(
+            models.Todo.completed  == False,
+            models.Todo.email_sent == False,
+            models.Todo.due_date   != None,
+            models.Todo.due_date   < today_str,
+        )
+        .all()
+    )
+
+    # ── Candidate 2: due today, and reminder_time has arrived ────────────────
+    due_today_todos = (
+        db.query(models.Todo)
+        .filter(
+            models.Todo.completed  == False,
+            models.Todo.email_sent == False,
+            models.Todo.due_date   == today_str,
+            (models.Todo.reminder_time == None) | (models.Todo.reminder_time <= current_hhmm),
+        )
+        .all()
+    )
+
+    candidates = overdue_todos + due_today_todos
+
+    sent     = []
+    failures = []
+
+    for todo in candidates:
+        # Determine urgency label for the email
+        is_overdue = todo.due_date and todo.due_date < today_str
+        try:
+            send_reminder_email(
+                title         = todo.title,
+                description   = todo.description,
+                due_date      = todo.due_date,
+                reminder_time = todo.reminder_time,
+                is_overdue    = is_overdue,
+            )
+            todo.email_sent = True
+            db.commit()
+            sent.append({"id": todo.id, "title": todo.title, "overdue": is_overdue})
+        except Exception as exc:
+            db.rollback()
+            failures.append({"id": todo.id, "title": todo.title, "error": str(exc)})
+
+    return {
+        "checked_at": now.isoformat(),
+        "candidates": len(candidates),
+        "sent":       sent,
+        "failures":   failures,
+    }
+
+
+@app.get("/reminders/email-status", tags=["Reminders"])
+def email_status():
+    """
+    Returns whether Gmail email alerts are configured and ready.
+    Useful for the frontend to show/hide the email feature indicator.
+    """
+    return {
+        "email_configured": email_configured(),
+        "sender": os.environ.get("GMAIL_USER", "") or None,
+        "recipient": os.environ.get("NOTIFICATION_EMAIL", "") or None,
+    }
