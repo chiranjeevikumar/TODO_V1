@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Todo Reminder App</title>
+  <meta name="description" content="A beautiful Todo and Reminder app — add tasks, set due dates, get reminded." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Background blobs ──────────────────────────────── -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <!-- ── App shell ─────────────────────────────────────── -->
+  <div class="app-container">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo">✅</div>
+        <div>
+          <h1>Todo Reminder</h1>
+          <p class="subtitle">Stay on top of everything</p>
+        </div>
+      </div>
+      <div id="reminder-bell" class="bell hidden" title="You have due reminders!">
+        🔔 <span id="reminder-count">0</span>
+      </div>
+    </header>
+
+    <!-- Add Todo Form -->
+    <section class="card form-card" id="add-todo-section">
+      <h2>Add New Task</h2>
+      <form id="todo-form" autocomplete="off">
+        <div class="form-row">
+          <div class="form-group full">
+            <label for="title">Task Title *</label>
+            <input id="title" type="text" placeholder="e.g. Call Mom" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group full">
+            <label for="description">Description (optional)</label>
+            <textarea id="description" rows="2" placeholder="Any details…"></textarea>
+          </div>
+        </div>
+        <div class="form-row two-col">
+          <div class="form-group">
+            <label for="due_date">Due Date</label>
+            <input id="due_date" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="reminder_time">Reminder Time</label>
+            <input id="reminder_time" type="time" />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" id="add-btn">
+          <span>＋</span> Add Task
+        </button>
+      </form>
+    </section>
+
+    <!-- Filter Tabs -->
+    <div class="filter-tabs" role="tablist">
+      <button class="tab active" data-filter="all"    role="tab">All</button>
+      <button class="tab"        data-filter="pending" role="tab">⏳ Pending</button>
+      <button class="tab"        data-filter="completed" role="tab">✔ Completed</button>
+      <button class="tab"        data-filter="due"    role="tab">🔥 Due Today</button>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat"><span id="stat-total">0</span> Total</div>
+      <div class="stat"><span id="stat-pending">0</span> Pending</div>
+      <div class="stat"><span id="stat-completed">0</span> Done</div>
+    </div>
+
+    <!-- Todos List -->
+    <section id="todos-list" class="todos-list" aria-label="Todos">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">📭</div>
+        <p>No tasks here yet. Add one above!</p>
+      </div>
+    </section>
+
+  </div><!-- /app-container -->
+
+  <!-- ── Reminder Alert Modal ───────────────────────────── -->
+  <div id="reminder-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-header">
+        <span class="modal-icon">🔔</span>
+        <h3>Due Reminders</h3>
+        <button id="close-modal" class="close-btn" aria-label="Close">✕</button>
+      </div>
+      <ul id="reminder-list" class="reminder-list"></ul>
+    </div>
+  </div>
+
+  <!-- ── Toast ─────────────────────────────────────────── -->
+  <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
