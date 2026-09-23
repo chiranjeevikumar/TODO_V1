@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, date
 from typing import List, Optional
+import os
 
 from .database import engine, get_db
 from . import models
@@ -12,10 +14,15 @@ from .schemas import TodoCreate, TodoUpdate, TodoResponse
 models.Base.metadata.create_all(bind=engine)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
+# root_path="/api" tells FastAPI that it is mounted under /api on Vercel,
+# so Swagger docs and redirects work correctly.
+IS_VERCEL = os.environ.get("VERCEL", False)
+
 app = FastAPI(
     title="Todo Reminder API",
     description="A simple Todo + Reminder API built with FastAPI and SQLite",
     version="1.0.0",
+    root_path="/api" if IS_VERCEL else "",
 )
 
 # Allow the HTML/JS frontend (served from a file or any port) to call this API
