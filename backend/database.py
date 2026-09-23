@@ -3,9 +3,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # ── Database URL ───────────────────────────────────────────────────────────────
-# In production (Vercel) this env var is set to the Neon PostgreSQL URL.
-# Locally it falls back to a SQLite file so local dev needs no extra setup.
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./todo.db")
+# Priority:
+#   1. DATABASE_URL env var  → used for PostgreSQL (Neon) in production
+#   2. VERCEL env var set    → use /tmp/todo.db  (Vercel fs is read-only except /tmp)
+#   3. Local dev             → use ./todo.db in the project root
+_IS_VERCEL = os.environ.get("VERCEL", "")
+_default_db = "sqlite:////tmp/todo.db" if _IS_VERCEL else "sqlite:///./todo.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", _default_db)
+
 
 # Neon (and most cloud PG providers) give URLs that start with "postgres://",
 # but SQLAlchemy 2.x requires "postgresql://".
