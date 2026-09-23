@@ -166,13 +166,17 @@ def mark_complete(todo_id: int, db: Session = Depends(get_db)):
 # ── Reminder endpoint ──────────────────────────────────────────────────────────
 
 @app.get("/reminders/due", response_model=List[TodoResponse], tags=["Reminders"])
-def get_due_reminders(db: Session = Depends(get_db)):
+def get_due_reminders(client_date: Optional[str] = None, db: Session = Depends(get_db)):
     """
     Returns todos whose due_date is today or in the past and are not yet completed.
-
-    Call this endpoint periodically from the frontend to show reminder alerts.
     """
-    today = date.today().isoformat()   # e.g. "2026-09-23"
+    from datetime import timezone, timedelta
+    if client_date:
+        today = client_date
+    else:
+        offset_hours = float(os.environ.get("TZ_OFFSET_HOURS", "5.5"))
+        today = datetime.now(timezone(timedelta(hours=offset_hours))).strftime("%Y-%m-%d")
+
     due = (
         db.query(models.Todo)
         .filter(
@@ -186,7 +190,12 @@ def get_due_reminders(db: Session = Depends(get_db)):
 
 
 @app.api_route("/reminders/send-emails", methods=["GET", "POST"], tags=["Reminders"])
-def send_reminder_emails(db: Session = Depends(get_db)):
+def send_reminder_emails(
+    client_date: Optional[str] = None,
+    client_time: Optional[str] = None,
+    tz_offset_minutes: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
     """
     Scan for todos that are overdue (due_date < today) or whose reminder_time
     has arrived today, are not yet completed, and haven't had an email sent yet.
@@ -205,9 +214,26 @@ def send_reminder_emails(db: Session = Depends(get_db)):
             detail="Gmail credentials not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD env vars."
         )
 
-    now          = datetime.now()
-    today_str    = now.strftime("%Y-%m-%d")
-    current_hhmm = now.strftime("%H:%M")
+    from datetime import timezone, timedelta
+
+    if client_date and client_time:
+        today_str = client_date
+        current_hhmm = client_time
+        checked_at = f"{client_date}T{client_time}"
+    elif tz_offset_minutes is not None:
+        tz = timezone(-timedelta(minutes=tz_offset_minutes))
+        now = datetime.now(tz)
+        today_str = now.strftime("%Y-%m-%d")
+        current_hhmm = now.strftime("%H:%M")
+        checked_at = now.isoformat()
+    else:
+        # Default to timezone offset if specified, fallback to +5.5 hours (IST)
+        offset_hours = float(os.environ.get("TZ_OFFSET_HOURS", "5.5"))
+        tz = timezone(timedelta(hours=offset_hours))
+        now = datetime.now(tz)
+        today_str = now.strftime("%Y-%m-%d")
+        current_hhmm = now.strftime("%H:%M")
+        checked_at = now.isoformat()
 
     # ── Candidate 1: fully overdue todos (due_date in the past) ──────────────
     overdue_todos = (

@@ -94,7 +94,8 @@ async function toggleComplete(id) {
 }
 
 async function fetchDueReminders() {
-  const res = await fetch(`${API}/reminders/due`);
+  const localDate = new Date().toLocaleDateString("en-CA");
+  const res = await fetch(`${API}/reminders/due?client_date=${localDate}`);
   return res.json();
 }
 
@@ -255,8 +256,12 @@ async function checkReminders() {
       bell.classList.add("hidden");
     }
 
-    // Trigger email alerts in background if configured
-    fetch(`${API}/reminders/send-emails`, { method: "POST" })
+    // Trigger email alerts in background with local timezone info
+    const now = new Date();
+    const localDate = now.toLocaleDateString("en-CA");
+    const localTime = now.toTimeString().slice(0, 5);
+    const tzOffset  = now.getTimezoneOffset();
+    fetch(`${API}/reminders/send-emails?client_date=${localDate}&client_time=${localTime}&tz_offset_minutes=${tzOffset}`, { method: "POST" })
       .then(r => r.json())
       .then(data => {
         if (data && data.sent && data.sent.length > 0) {
