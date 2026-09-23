@@ -341,9 +341,10 @@ modal.addEventListener("click", (e) => {
 
 fetchTodos();
 fetchEmailStatus();
+checkReminders(); // check immediately on load
 
-// Poll for due reminders every 60 seconds
-setInterval(checkReminders, 60_000);
+// Poll for due reminders every 15 seconds
+setInterval(checkReminders, 15_000);
 
 // Refresh email status every 5 minutes
 setInterval(fetchEmailStatus, 5 * 60_000);

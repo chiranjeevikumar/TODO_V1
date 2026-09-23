@@ -49,6 +49,15 @@ app = FastAPI(
     root_path="/api" if IS_VERCEL else "",
 )
 
+@app.middleware("http")
+async def strip_api_prefix(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/"):
+        request.scope["path"] = path[4:]
+    elif path == "/api":
+        request.scope["path"] = "/"
+    return await call_next(request)
+
 # Allow the HTML/JS frontend (served from a file or any port) to call this API
 app.add_middleware(
     CORSMiddleware,
@@ -59,13 +68,7 @@ app.add_middleware(
 )
 
 
-# ── Health endpoints ───────────────────────────────────────────────────────────
-
-@app.get("/", tags=["Health"])
-def home():
-    """Root endpoint — confirms the API is alive."""
-    return {"message": "Todo Reminder API is running!", "version": "1.0.0"}
-
+# ── Health endpoint ───────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["Health"])
 def health():
@@ -272,3 +275,12 @@ def email_status():
         "sender": os.environ.get("GMAIL_USER", "") or None,
         "recipient": os.environ.get("NOTIFICATION_EMAIL", "") or None,
     }
+
+
+# ── Mount frontend static files when running locally ──────────────────────────
+if not IS_VERCEL:
+    from fastapi.staticfiles import StaticFiles
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+    if os.path.exists(frontend_dir):
+        app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
